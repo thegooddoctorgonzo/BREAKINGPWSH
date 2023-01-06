@@ -1,0 +1,38 @@
+The CompareTo() method does just what it sounds like - compare 2 objects and determine the order of the 2 objects. It was created to have an easy way to compare versions of applications, scripts, whatever. So if you're scripting app updates (and BTW you should be using chocolatey for that so you dont have this problem), you'll need to compare the current and newest version so you can have some logic in applying the updates. The problem is that it doesn't really work - not at least since software versioning went to a major.minor.build versioning structure.
+
+MS documents show that .CompareTo() is a method of System.Management.Automation.PSObject (https://learn.microsoft.com/en-us/dotnet/api/system.management.automation.psobject.compareto?view=powershellsdk-7.3.0). For some reason I can't verify that. If I create a new empty object of type PSObject, I dont see that method and the type shows as PSCustomObject.
+
+$obj = New-Object -TypeName psobject
+
+Get-Member -InputObject $obj
+
+I've found the method to only be available in 3 base types - string, int, and double. But whatever. Doesn't matter. I'll work on tracking that down another day.
+
+Back to why/how it doesn't work... Just to be complete, how do I think that versioning "ordering" should work? - probably like everyone else. Version 5.1 is newer/greater than 5.0, and "10.0" is newer/greater than "9.0". We can check this pretty easily by calling the method on a double base type. The returned int is the ordering of the version and the compared version. "0" is equal - "-1" is the reference version is older than the "ToCompare" version - "1" is the reference version is newer than the comparison. Couple commands to double check that...
+
+(5.5).CompareTo(5.5) 
+(5.5).CompareTo(5.1) 
+(5.5).CompareTo(5.9)
+
+That all works as expected. Now check this out...
+
+(5.5).CompareTo(10.1)
+
+Still looking good here. You should have got a "-1" returned - 5.5 is an older version than 10.1. Now try this one..
+
+('5.5').CompareTo('10.1')
+
+And the return you get is a "1", when it should be "-1". So obviously the problem here lies in how strings are evaluated. You might say "OK thats just how it works" and you would be right. But the problem I see is that when you use PowerShell to get the version of the app installed and the app to be installed, you can use several different methods and get return values of int, double or string. CompareTo doesn't take into account comparing values of different base types. Try this one....
+
+(5.5).CompareTo(10)
+
+Got an error eh? That's just ridiculous - apparently it can't handle different base types. Actually I guess that means that there is a different CompareTo for each base types, right? I suppose I could go back on my previous statement that the "PSObject base type doesn't have a CompareTo method". I would bet that it does have that method, but it isn't public, and the instatiated sub-types (int, double, string) each have an overriding CompareTo function - which is why they would be incompatible with different types. My god, could anyone still possibley be reading this. If you are - hang in there...
+
+Where do we stand now? If you compare int to int - works. Compare double to double - works. Compare string to string - unreliable results.For that last one, I'll show you why it returns false results with a little more detail. When the method does the compare, it compares based on position/value vs position/value - and does that in sequence. If you comapare 1.1 vs 1.2, the method comapares 1 to 1 (the first values), finds those are equal and moves to the next value (ignore the "."). Next compare is 1 to 2 (second value), returns a "-1", all good there. Now compare versions 10.1 to 5.1. Compare the first positions - 1 is less than 5, and it returns a "-1". It's not comparing strings. It's casting those strings to char arrays, and comparing them in order. It should be comparing the digits it finds up to the next ".". Even if you compare 2 to 10000, 2 will be the higher version.
+
+Ok, so we know which versions work and which are flaky. So you can just always use the double version - that seems like the best of the 3 since versioning numbers are x.y.z. The problem there is that you'll get versionsing numbers from various sources. I've used the properties of the exe file, config management DBs, WMI calls, readme files in the installed program files. You could get any of the 3 types from any source. So at that point you can just cast the data to type double, right? Nope, you can't cast int and strings to double.
+
+[double](6).GetType()
+[double]("6").GetType()
+
+I've worked out ways around all this for specific apps, but so far I haven't found a decent way to generalize it enough to be reliable comparing version numbers that could be any data type. Where does this leave us - well it works. It's just not reliable enough to use for making logic decisions in general. 

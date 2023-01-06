@@ -1,2 +1,2 @@
 # BREAKINGPWSH
-Articles and scripts from BREAKINGPWSH.com
+Articles and scripts from https://BREAKINGPWSH.com

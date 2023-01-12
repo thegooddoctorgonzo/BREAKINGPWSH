@@ -1,0 +1,73 @@
+One of the curses of getting better at a skill, is that you eventually get the knowledge to look back at what you created when you started - and realize what you could have improved on. This is definitely true of writing code. If you have been saving all your scripts and functions, you can easily go back and see what you would have done differently. It would be nice if you could apply that new knowledge you have now to all that old code...
+
+
+
+In my case today, I wanted to make a change to my snippet for creating cmdlets. This is the template that I use for the base of every new advanced function that I make. I updated the template, but I would also like to have that functionality in a couple hundred old functions that were made with that template. Going through them by hand is out of the question, so some sort of text manipulation using PowerShell will be the tool.
+
+
+
+What I want to do is add a new parameter to all these functions in files that have been created over the past few months. The new param is called $CreateTranscripts, and will be used in an IF block to toggle whether the function creates a transcript or not. The transcripts were useful when building these functions out, but now that it is relatively stable, they aren't needed. But just in case I want to turn them back on, this param will make them available.
+
+
+
+Let's start with Get-ChildItem to get a list of files.
+
+
+
+$files = Get-ChildItem -Path .\Functions\ | Where-Object {$_.Name -like "*.ps1"}
+
+
+
+Now I need to add the new param text after the last param declaration in the function. I'll assign the last line of the past param to the var $findText.
+
+
+
+$findText = '$DCcreds = (Get-Credential)'
+
+
+
+Then the new text assigned to the var $replaceText. It has tabs and new lines, so replace those with `t and `n for each. Don't forget that the original text needs to be included in the $replaceText value.
+
+
+
+$replaceText = '$DCcreds = (Get-Credential),' + "`n`n`t`t#Create transcripts for every STIG check for troubleshooting - off by default`n`t`t" + '[Parameter(Mandatory=$false)]' + "`n`t`t" + '[switch]' + "`n`t`t" + '$CreateTranscripts'
+
+
+
+The easiest way to get the new text in is to get the contents of the file and assign to a variable, replace the text, then save the file with the new text and the same name as the original. I'll use Get-Content to get the text and assign that to a string variable. String objects have a method called replace. In its simplest form it takes 2 arguments - first is the text to find, and the second is the text to replace it. Note that replace does not actually change the variable - the replace only happens in that cmdlet call. Run the lines below for an example.
+
+
+
+$string = "aabbccdd"
+
+Write $string
+
+Write $string.replace("bb","XX")
+
+Write $string
+
+
+
+To "save" the changes, assign the output of the replace cmdlet to a new (or the same) variable. Then save that new content back to a file of the original name.
+
+
+
+foreach($file in $files)
+
+{
+
+    $content = Get-Content -Path $file.fullName
+
+
+
+    $content = $content.replace($findText,$replaceText)  
+
+
+
+    $content | Out-File -FilePath $file.fullName -Force -Confirm:$false -Verbose
+
+}
+
+
+
+This is simple and still works well at scale. A couple hundred docs adjusted in just a few seconds.

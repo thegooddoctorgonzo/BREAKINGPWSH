@@ -1,0 +1,61 @@
+Let's get way into the weeds on how the definitions of functions and cmdlets are broken. If you make it to the end of this article, we're new BFFs....
+
+_________________________________________________________________________________
+
+
+
+I wanted to do some clarifications on the details of pwsh modules and the files that make them up. In the manifest file, there are also some gotchas that can cause some frustration. Then to top it off, the definition of functions, cmdlets, and the "other" cmdlets is pretty gray. Microsoft, or at least the Powershell team, is trying to clarify which fall into which category. They have made an offical change to the documentation but there is still room for interpretation in there. I'll give you my guidelines that I use to define each type - 99% of the time you'll only need 2 out of the 3. I'll kind of use the terms indescriminately for now, and clear it up later.
+
+
+
+So, the minimum for a module is actually only 1 file - just a .psm1 file with a function defined. You import the module - by the name of the psm1 file - and that function is now available in your session. While this works, it's not what most people would consider a "real" module. I've never used this method myself in production. Dot-sourcing a .ps1 file with a function/cmdlet is basically the same thing. 
+
+
+
+Step that up one notch now to multiple functions/cmdlets in multiple files. Each file - a .ps1 - has its own defined cmdlet. To create the module again, you need a psm1 file that this time doesn't define any functions but lists a number of functions to load into your session. Just like you would dot-source a file with a function into a script, it's the same here - dot-source each file in the psm1. Then when the import-module cmdlet is called, those functions that exist in those ps1 files will be imported.
+
+
+
+Now that you have a functioning module, the next step is to create a manifest file (.psd1). The manifest file is used for the metadata of the cmdlet. You can specify the author, PowerShell versions it is compatible with, necessary modules to be loaded before this module is loaded, and versioning. If you plan on publishing, this is a necessary file as it is referenced when a module is updated. But even if you don't plan on publishing outside of your team, it's still useful for versioning and tracking who wrote what.
+
+
+
+So I went through all that to get to this - the definition of a function and cmdlet in the psd1 file are not clear. There are 2 available hash tables in the .psd1 file to list the cmdlets/functions you want available in the file - CmdletsToExport and FunctionsToExport. If you list cmdlets in the functions definition, your module will load but the cmdlets wont. Pwsh doesn't help with figuring out why either, because it still calls your cmdlets functions even when the module does import. I'll break that down some more to show just how frustrating it is...
+
+
+
+1. You create a file, with a function - literally using the keyword function
+
+2. You create a psm1 file to dot-source that file
+
+3. You create a psd1 file and list that function in FunctionsToImport
+
+4. You import the module - and the import works - but no function is available
+
+
+
+... and it's because your function has the pwsh default parameters. More specifically you left in the [CmdletBinding()] line. If you do a snippet insert for a cmdlet (or advanced function) in the editor, you'll see the line [CmdletBinding()] in params. This line gives your cmdlet access to the default params of pwsh - verbose, whatif, confirm, etc. Your cmdlet is defined as a function, but apparently the session host doesn't agree with that. A function with parameters is actually something else that isn't specified. So it is a function, a cmdlet, and kinda also neither.
+
+
+
+So let's define practically what each is and forget about what MS's loose definitions are.
+
+
+
+A function is a function with or without parameters
+
+A cmdlet (also called an advanced function) is a function with parameters and cmdlet binding
+
+A binary cmdlet (normally just called a cmdlet) is built with .NET to a dll file
+
+
+
+These definitions follow the new guidance that the pwsh team has published. But it hardly helps to clear anything up, because there is no definition of those "other terms" in pwsh (O.G. or core). They could change the code to add those 2 keywords (cmdlet, and binary_cmdlet), but that would very likely be what they call a breaking change. In my opinion, this could have been addressed when core was first built - but that ship has sailed.
+
+
+
+https://github.com/MicrosoftDocs/PowerShell-Docs/issues/6105
+
+
+
+So to wrap up, use those guidelines to list your functions and cmdlets in your modules. If you have issues importing the cmdlets/function with the module, check what params your cmdlets have. 

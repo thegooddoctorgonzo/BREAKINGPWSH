@@ -1,0 +1,81 @@
+Ran into a new problem today that somehow I have never had before. I created a PSCustom object to work with some XML. After collecting the data into the custom object, and then those objects into an array, I created a new variable ($newList) and assigned it the value of the original object array. Then I cleared the original object array to use for the second XML sheet data, and did the same as before to a new variable ($oldList).  
+
+
+
+So when I started doing some comparison of the 2 objects, all I got was evidence that the second array had good data and that the first had nothing. Which was right. When assigning an object array the value of another object array, it is not a copy that the new var holds. The second var has now become a reference pointer to the original array. When the original is deleted or cleared, the new var still points to the original and its values - which in this scenario is useless. There are scenarios where this is useful, but that is another article. This type of copy is called shallow copy.
+
+
+
+If there is a shallow there must be a deep. This is the copy type you are probably familar with. In deep copy, if the original data is deleted it doesnt affect the copy of the date. Normally an $obj = $obj copy is suffecient for deep copy, but not with arrays. But there is a simple fix - the Clone() method. The clone will do a full copy of the data to the new var that has no dependency om the original. You could also iterate through each object of the array and assign it to the new var one at a time - if you dont have to do it, dont do it.
+
+
+
+Run the below script to get a better scope on it. Comment out the other 2 test blocks for each run.
+
+
+
+#create the new object
+
+$objTemplateObject = New-Object -TypeName psobject
+
+#make some prpoerties for it
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name Name -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name CreatedDate -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name ModifiedDate -Value $null
+
+#create a new dynamic array
+
+$objList = New-Object System.Collections.ArrayList
+
+#create a list of files
+
+foreach($file in $(Get-ChildItem -Path C:\. -Depth 1))
+
+{
+
+    #instantiate 1 of those objects
+
+    $objTemp = $objTemplateObject | Select-Object *
+
+    #add values to the properties
+
+    $objTemp.Name = $file.Name
+
+    $objTemp.CreatedDate = $file.CreationTime
+
+    $objTemp.ModifiedDate = $file.LastWriteTime
+
+    #add the object to an array
+
+    $objList.Add($objTemp) | Out-Null
+
+}
+
+
+
+#test 1
+
+New-Variable -Name $newList -Value $objList 
+
+$objList.Clear() 
+
+$newList
+
+#test 2
+
+$newList = $objList
+
+$objList.Clear() 
+
+$newList
+
+#test 3
+
+$newList = $objList.Clone() 
+
+$objList.Clear()
+
+$newList

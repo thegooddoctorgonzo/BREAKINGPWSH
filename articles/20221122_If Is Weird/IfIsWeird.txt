@@ -1,0 +1,143 @@
+Warning this one is gonna get way in the weeds for no reason)
+
+Working on a project this week I noticed that if() doesn't work exactly like I always thought it did. Of course, the normal way everyone expects is if the expression in the parens evaluates to true, then take the action the script block. But what I noticed is that the eval in the parens doesn't have to be "true", it just has to exist. So, let's run through some scenarios and see if we get something unexpected.
+
+
+
+Basic stuff first...
+
+if($true){Write "Hello"}
+
+if($false){Write "Bye"}
+
+
+
+PS C:/Code> if($true){Write "Hello"}
+
+Hello
+
+PS C:/Code> if($false){Write "Bye"}
+
+PS C:/Code> 
+
+
+
+So those are expected outcomes. I'll assign a variable and use that for the evaluation...
+
+
+
+$exists = "abc"
+
+if($exists){Write "Exists"}
+
+if($existsNOT){Write "Doesn't exist"}
+
+
+
+There is that other way it evaluates. If the variable exists, then the if is true. Maybe an assigned variable will evaluate to $true?
+
+
+
+$exists -eq $true
+
+
+
+Nope. Other way around?
+
+
+
+$true -eq $exists
+
+
+
+Let's try some other evaluators...
+
+
+
+$exists -in $true
+
+
+
+WTH is that? I don't even know where to go with that. Flip it?
+
+
+
+$true -in $exists
+
+
+
+At least that makes sense. Let's move back to the original issue. Instead of just putting a var, I'll use Get-Variable.
+
+
+
+if(Get-Variable exists) 
+
+{Write "sdfsdf"}
+
+
+
+if(Get-Variable existsNOT)
+
+{Write "sdfsdf"}
+
+
+
+Or maybe its the value of the variable, and not the variable itself. I'll assign one to $null... should fail right?
+
+
+
+$test = $null
+
+if($test){Write "test"}
+
+
+
+OK, expected result. $null doesnt equal false, but its value doesn't exist. Basically an unassigned variable, right?
+
+
+
+New-Variable -Name novalue
+
+if($novalue){Write "novalue"}
+
+
+
+Yup. Let's try some math. I'll do a couple that evaluate for a value and a couple for "exists".
+
+
+
+if(1 + 1 -eq 2){Write "math1"}
+
+if(1 + 1 -eq 34){Write "math2"}
+
+if(1 + 1){Write "math3"}
+
+
+
+OK, so one true, one false, and one exists-true. I know 0 can be used to represent false - let's try 1 and 0.
+
+
+
+if(1){Write "1"}
+
+if(0){Write "0"}
+
+
+
+So does 0 evaluate to false or null. Let's cast it to a few different types in the eval....
+
+
+
+if([bool]0){Write "bool"}
+
+if([string]0){Write "string"}
+
+if([int]0){Write "int"}
+
+
+
+So definitely 0 can be used to represent false. An integer of 0 I'm guessing is a null. And the string is just a string, doesn't matter what the value is.
+
+
+
+So what did I learn from all this? Maybe that if() works just like you would expect it to work, even if it doesn't work how you might expect. 

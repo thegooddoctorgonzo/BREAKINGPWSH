@@ -1,0 +1,17 @@
+$base = cmd.exe /c set 
+
+$base_select = cmd.exe /c set | Select-String -SimpleMatch "LOGONSERVER" 
+
+$base_string = (cmd.exe /c set | Select-String -SimpleMatch "LOGONSERVER").tostring() 
+
+$base_split = (cmd.exe /c set | Select-String -SimpleMatch "LOGONSERVER").tostring().Split("\\") 
+
+  
+
+$base.GetType() 
+
+$base_select.GetType() 
+
+$base_string.GetType() 
+
+$base_split.GetType() 

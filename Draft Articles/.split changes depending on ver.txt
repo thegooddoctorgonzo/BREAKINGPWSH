@@ -1,0 +1,24 @@
+
+
+#typed text 
+$a = "abcd1234" 
+Write-Host "Typed text "'$a'" is $($a.split('d'))" 
+Write-Host "Count of split Typed text "'$a'" is $($a.split('d').count)" 
+ 
+ 
+Write-Host "`n-------------`n" 
+ 
+ 
+#from cmd - single line 
+$b = cmd.exe /c whoami 
+Write-Host "CMD single line text "'$b'" is $($b.split('\'))" 
+Write-Host "Count of CMD single line text "'$b'" is $($b.split('\').count)" 
+ 
+ 
+Write-Host "`n-------------`n" 
+ 
+ 
+#from cmd  - select string 
+$c = cmd.exe /c set 
+Write-Host "CMD multiple line text "'$c'" is $(($c | Select-String logonserver).Tostring().Split("\\"))" 
+Write-Host "Count of CMD multiple line text "'$c'" is $((($c | Select-String logonserver).Tostring().Split("\\")).count)" 

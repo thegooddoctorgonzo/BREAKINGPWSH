@@ -1,0 +1,65 @@
+So, if you have been using PowerShell for more than a few months (or hours likely), you've definitely used the Write-Host cmdlet. I would also bet that you have discovered the Write-Output cmdlet - probably even used it. Next, you probably Googled what the difference is between the 2 cmdlets - and found a bunch of articles on how you should never use Write-Host. That Write-Output was the only correct way to show text output to the console. Congrats, you have found the most pointless PowerShell argument that exists. I would like to keep that tradition going, so I'll tell you why they are wrong. 
+
+
+
+Let's compare the 2 cmdlets to start. Write-Host is the cmdlet to use if you want to write to the screen, possibly with colors, to show the user some output text while the script is running. Maybe you're iterating through a list of servers, or when you hit a different stage of the script, and want to keep the user informed of current state. Write-Output is very similar and can be used in the same instances - minus the colorful part. The advantage of Write-Output is that the text can be piped to the "stream" or "pipeline" and used by a cmdlet further in the pipeline. Maybe even passed to another script. Thats the big difference there - -Host is for humans, -Output is for the powershell host. There is no right or wrong cmdlet. It's only using the right cmdlet in the right context.
+
+
+
+Let's go through a few examples, just for clarification. This first line is straight from Microsoft's PowerShell docs, and well go from there. Run these 3 lines separately.
+
+
+
+Write-Output "test output" | Get-Member
+
+"test output" | Get-Member
+
+Write-Host "test output" | Get-Member
+
+
+
+Line 1 works, as does line 2. Line 3 throws an error because Write-Host does not pass any value out to the stream. It only writes to the console. Great, so they obviously work differently. That difference is exactly why the whole argument is pointless. It's like people choose this arbitrary hill to die on, when the only thing to be said is "use the right tool for the job". You wouldn't use Get-Item to get all the files in a folder, you would use Get-ChildItem. One just makes more sense than the other. You do you - but you will be judged silently.
+
+
+
+So, let's make an argument the Write-Output is the WRONG cmdlet to use - just to even things out. Take a look back at lines 1 and 2 above again. Outcome was no different for both. So, what's the point? If you are passing a string to a cmdlet through a pipe, that string had to come from somewhere. You could just as easily pass the output of the cmdlet that generated it to the next in the stream. For example...
+
+
+
+Get-Process powershell | Select-Object -ExpandProperty path | Get-Item
+
+Get-Process powershell | select -ExpandProperty path | Write-Output | Get-Item
+
+
+
+Don't have much need for that Write-Output in there, right? The next use case is to pass that output string to another script. My opinion - just don't. I've been doing this for a long time, and I have never come across a need for a script to return a plain text string. Simple example here...
+
+
+
+function Test-thing {
+
+  Write-Output "return string"
+
+}
+
+
+
+If you need to pass data between scripts or functions, put it in a variable and return that from the function. 
+
+
+
+function Test-thing {
+
+    $r = "return string"
+
+  return $r
+
+}
+
+
+
+It's just a cleaner way to write your code. 
+
+
+
+NOTE: This article has intentionally been written to be inflammatory and I welcome anyone to try to prove me wrong....

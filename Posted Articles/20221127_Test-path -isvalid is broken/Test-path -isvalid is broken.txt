@@ -1,0 +1,75 @@
+I recently found a new parameter in an old cmdlet I had not noticed before - and it doesn’t work. The Test-Path cmdlet does just that - tests that the path to a file or directory points to an existing object. The -IsValid parameter overrides whether the path exists or not - and only tests that the path is a valid path, whether or not it resolves to an actual object. MS docs explains it as..
+
+
+
+"Indicates that this cmdlet tests the syntax of the path, regardless of whether the elements of the path exist. This cmdlet returns $True if the path syntax is valid and $False if it is not."
+
+
+
+Test-Path (Microsoft.PowerShell.Management) - PowerShell | Microsoft Learn 
+
+
+
+
+
+But… it - as far as I can tell - does not work. I'll run through a few iterations.
+
+
+
+PS C:/Code> Test-Path -Path ".\Projects\"
+
+True
+
+Correct - that folder exists
+
+
+
+PS C:/Code> Test-Path -Path ".\Projects\" -IsValid
+
+True
+
+Still correct
+
+
+
+PS C:/Code> Test-Path -Path ".\sdfsdf" 
+
+False
+
+Also correct - that does not exist
+
+
+
+PS C:/Code> Test-Path -Path ".\sdfsdf" -IsValid
+
+True
+
+Yup - exists and valid. Note that when -IsValid is used, they return value always coordinates to the "IsValid" parameter. 
+
+
+
+PS C:/Code> Test-Path -Path "%tg67" -IsValid
+
+True
+
+Not correct - doesn’t exist
+
+
+
+PS C:/Code> Test-Path -Path "{}[]" -IsValid
+
+True
+
+Definitely not valid path chars
+
+
+
+PS C:/Code> Test-Path -Path ".\Projects:;\" -IsValid
+
+True
+
+Not valid chars - and it doesn’t exist
+
+
+
+I found a few related issues submitted to the Powershell github Issues, but it does not seem like an issue for them. Or I'm missing something. My advice for now is to not trust it.

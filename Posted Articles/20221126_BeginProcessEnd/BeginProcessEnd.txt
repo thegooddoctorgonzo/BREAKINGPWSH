@@ -1,0 +1,155 @@
+When creating advanced functions or cmdlets, the processing always follows the same basic flow. Blocks of code are processed starting with block BEGIN, then PROCESS, followed by END.
+
+BEGIN for setting up and assigning variables. PROCESS does the bulk of code. END is for cleanup of vars, close files, close logs, etc. So what if in some scenarios the order needs to change? What if you want to skip PROCESS?
+
+
+
+The only way to skip the process block is with an if() or similar. There must be a way to call END from BEGIN. Maybe do a new type of cmdlet with 3 functions defined to take the place of BEGIN/PROCESS/END.
+
+
+
+I have a need for this in some functions I've been building. In the BEGIN block I'm testing several files for if the path can be resolved, and if the right file extensions are found. I'm also outputting the values of the vars to the terminal for the user to confirm or reject. So say the user rejects the values when prompted. When that happens the script exits. The problem is that log files have already been started, and if the script exits those logging files will be left opened and not closed out. What I need the workflow to be is that if the user cancels (or there are file problems), the PROCESS block needs to be skipped but still go to the END block. END will clean up the open files. 
+
+
+
+There is no builtin command for calling END from BEGIN, so some kind of logic is needed. My initial though was to have a bool variable that would control whether the code in PROCESS would be evaluated. Note that that bool variable check is in the code in PROCESS, not outside and controlling the call to the PROCESS block itself. Putting an if() at the beginning of PROCESS that evaluates on the bool var seemed the simplest - and what I stuck with. I don't really care for doing it that way, but it works. 
+
+
+
+But why leave well enough alone? What if there could be a function that could run without the BEGIN - PROCESS - END flow? Functions don't require the 3 blocks - so I have some leeway there. So, I tried creating a new structure that could run in either the normal way or go directly to END at any time. I came up with the below, which admittedly is a mess - but maybe it's just the first step in a better solution.
+
+
+
+ 
+
+function MyBEGIN ($param1, $param2)
+
+{
+
+    Write-Output "IN BEGIN - Param1: $param1"
+
+    Write-Output "IN BEGIN - Param2: $param2"
+
+
+
+    if($param2 -eq 1)
+
+    {
+
+        MyEND -param1 $param1 -param2 $param2
+
+    }
+
+    else
+
+    {
+
+        MyPROCESS -param1 $param1 -param2 $param2
+
+    }
+
+}
+
+
+
+function MyPROCESS ($param1, $param2)
+
+{
+
+    Write-Output "IN PROCESS - Param1: $param1"
+
+    Write-Output "IN PROCESS - Param2: $param2"
+
+
+
+    MyEND -param1 $param1 -param2 $param2
+
+}
+
+
+
+function MyEND ($param1, $param2)
+
+{
+
+    Write-Output "IN END - Param1: $param1"
+
+    Write-Output "IN END - Param2: $param2"
+
+}
+
+
+
+function Test-NewF
+
+{
+
+    [CmdletBinding()]
+
+
+
+    Param
+
+    (
+
+        # Param1 help description
+
+        [Parameter(Mandatory=$true)]
+
+        [string]
+
+        $Param1,
+
+
+
+        # Param2 help description
+
+        [Parameter(Mandatory=$true)]
+
+        [int]
+
+        $Param2
+
+    )
+
+
+
+    MyBEGIN -param1 $param1 -param2 $param2
+
+}
+
+
+
+Run that code to import the functions to your session, then call the function Test-NewF in the terminal. Use 1 and then (whatever [int32]) for the value of param2 to see how it can skip the MyPROCESS block/function.
+
+
+
+PS C:/Code> Test-NewF -Param1 abc -Param2 1
+
+
+
+IN BEGIN - Param1: abc
+
+IN BEGIN - Param2: 1
+
+IN END - Param1: abc
+
+IN END - Param2: 1
+
+
+
+PS C:/Code> Test-NewF -Param1 abc -Param2 2
+
+
+
+IN BEGIN - Param1: abc
+
+IN BEGIN - Param2: 2
+
+IN PROCESS - Param1: abc
+
+IN PROCESS - Param2: 2
+
+IN END - Param1: abc
+
+IN END - Param2: 2

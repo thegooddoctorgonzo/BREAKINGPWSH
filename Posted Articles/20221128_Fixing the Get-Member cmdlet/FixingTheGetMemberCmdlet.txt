@@ -1,0 +1,69 @@
+Lets make a new cmdlet. A simple one, to make a current cmdlet work like even a PWSH novice would expect it to. I'll build a new cmdlet that calls the Get-Member cmdlet, but makes a necessary parameter the default.
+
+
+
+If you are not familiar with it, Get-Member is the go to command for getting the properties and methods of an object. If you assign a string to a variable ($a = "123"), you can then use that var to get the properties and the methods available to that object. 
+
+
+
+Get-Member -InputObject $a
+
+
+
+And now we get to the problem here. In pretty much every cmdlet, the main object that you are trying to manipulate or gather, you can specify it with out using the named parameter. For example...
+
+
+
+Get-Item .\Projects\
+
+Get-Command Get-help
+
+Get-ItemProperty .\Projects\
+
+Get-LocalUser steve
+
+
+
+Those are intuituve. Your looking for a local user with Get-LocalUser, so you just put the users name. Easy. But for some reason, this does not...
+
+
+
+Get-Member $a
+
+
+
+This is because, and if you run Get-Help Get-Member -Parameter * you'll see, that InputObject is not mandatory. More importantly its position value is "Named". This means that the parameter has to be specified, just as in that first example above. If you look further down the list of params, you'll see Name. Note the value of 0 for Position. The 0 means that it is looking for a value for that param in the first param position without being named. So this below is how it works.
+
+
+
+Get-Member Length -InputObject $a
+
+
+
+And you get back the length property for that string in $a. So that works, but it is definitely not intuitive. I think most PWSH users would expect InputObject to be in the default first and unnamed position. But it is fixable and not hard to do so.
+
+
+
+We'll start with creating a new function. The alias for Get-Member is gm. I want Get-Member to take InputObject as an unnamed param, so I'll name the function gmi. It will have 1 parameter, and use that param with the Get-Member cmdlet I'll call in the func.
+
+
+
+function gmi ($p1)
+
+{
+
+    Get-Member -InputObject $p1
+
+}
+
+
+
+F5 that script to load it into the host session and call it.
+
+
+
+gmi $a
+
+
+
+You have your properties and methods for that object. With a little less typing. Put that function in your profile file, and it'll be available every time.

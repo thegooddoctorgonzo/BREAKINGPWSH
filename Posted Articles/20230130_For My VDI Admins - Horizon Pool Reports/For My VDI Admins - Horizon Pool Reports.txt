@@ -1,0 +1,344 @@
+When managing a domain, whether you are a one-man shop or one of many in a large enterprise, generating reports with pointed information is key to keeping the domain running. I've always tried to create reports for anything that I go back and check everyday. Logins per day, share folder sizes, new users created, status of automated processes that ran overnight, whatever. Then depending on the output, these can be compiled in an archive or emailed out to teams and management.
+
+
+If you have ever been involved with the management of a VDI environment, keeping track of all the pools can be overwhelming. Keeping the pools up to date means you need to know what master images and snapshots are used by the pools. If you rotate through lots of master images and snapshots, knowing which are in use or not means you can clean out those unused objects. Pool information like whether HTML access is enabled and timeout values is useful for double checking they have the right values. It's a lot of information that a team that manages VDI could use to make daily decisions.
+
+
+To get all this info, we need to connect to vCenter and to the ADSI service on one of the connection servers. You'll get info from vCenter for your master images, and info from the ADAM DB on the connection server for pool info. If you want to automate it, you'll need to manage credentials in a somewhat secure method. Read through the links to get an idea on how to keep creds "secure enough". (I'm gonna do a more complete article on how I manage creds in a future article)
+
+
+https://www.pdq.com/blog/secure-password-with-powershell-encrypting-credentials-part-1/
+
+https://docs.microsoft.com/en-us/powershell/scripting/learn/deep-dives/add-credentials-to-powershell-functions?view=powershell-7.2
+
+
+I've transferred this script through 3 different jobs and all I have to do is update the creds and connection info. This is pretty lengthy so I'll walk through the tricky parts, but it's ready to rock in your enterprise. But you're a cautious admin arent ya, so check through the code, read the comments, and let it loose.
+
+
+######################################Let's go####################3
+
+
+Setting up the credentials here. The password is hashed in a file that only the service account and domain admins have acess to.
+
+$password = Get-Content C:\Scripts\Container\PoshSS.txt | ConvertTo-SecureString -Key (Get-Content C:\Scripts\Container\aes.key)
+
+$VCcreds = New-Object System.Management.Automation.PsCredential("domain\SVCACCT",$password)
+
+
+Import the PowerCLI module and disconnect from any vCenters you may be attached to already. If you have multiple vCenters that aren't linked (or are), best to drop whatever is already attached and start fresh.
+
+Import-Module -Name vmware.powercli
+
+if($global:defaultviserver)
+
+{
+
+    Disconnect-VIServer -Confirm:$false -ErrorAction Ignore -Server *
+
+}
+
+
+Connect to vCenter with creds. Note the try/catch to handle errors. I left my custom functions to handle errors in there just for example. Pull those out and substitute whatever code you want to handle errors.
+
+try{
+
+Connect-VIServer [VCENTER] -ErrorAction Stop -Credential $VCcreds -AllLinked
+
+}
+
+catch [VMware.VimAutomation.Sdk.Types.V1.ErrorHandling.VimException.ViServerConnectionException]{
+
+#Collect-Errors -LogLines $_ -Label "Failed connect to vServer" -Level FATAL -LineNum (Get-CurrentLine) -PassedList ([ref]$NotificationLog)
+
+#Write-ToMasterLog -Entries $NotificationLog -Header $Header
+
+exit
+
+}
+
+catch{
+
+continue
+
+}
+
+Start-Sleep -Seconds 5
+
+
+Next, connect to the ADSI ADAM DB on the Connection server over LDAP. The ADAM DB has all the Horizon pool info.
+
+$directory = New-Object System.DirectoryServices.DirectoryEntry("LDAP://[HORIZONCXSERVER]:389/OU=Server Groups,DC=vdi,DC=vmware,DC=int")
+
+
+Everyone that is good at PWSH hates this, but F 'em - this works. Creating an array of a custom powershell object to hold info for each pool.
+
+$objTemplateObject = New-Object -TypeName psobject
+
+
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name Name -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name MI -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name SS -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name ou -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name Total -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name defaultProtocol -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name timeout -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name HTML -Value $null
+
+
+
+$objList = New-Object System.Collections.ArrayList
+
+
+And now we'll do a foreach and iterate though each pool, collecting all the interesting info.
+
+foreach ($pool in $directory.psbase.Children)
+
+{
+
+    $objTemp = $objTemplateObject | select *
+
+
+
+    $objTemp.Name = ($pool.'pae-DisplayName').ToString()
+
+    $objTemp.MI = ($pool.'pae-SVIVmParentVM').ToString().split('/') | Select-Object -Last 1
+
+    $objTemp.SS = ($pool.'pae-SVIVmSnapshot').ToString().Split("/") | select -Last 1
+
+    $objTemp.ou = ($pool.'pae-ContainterPath').ToString()
+
+    $objTemp.total = ($pool.'pae-VmMaximumCount').ToString()
+
+    $objTemp.defaultProtocol = ($pool.'pae-ServerProtocolDefault').ToString()
+
+    $objTemp.timeout = ($pool.'pae-OptDisconnectLimitTimeout').ToString()
+
+    $objTemp.HTML = ($pool.'pae-HTMLAccessEnabled').ToString()
+
+
+
+
+
+    $objList.Add($objTemp) | Out-Null
+
+}
+
+
+If you have multiple Horizon pods, copy/paste this next part as many times as needed for each pod. Otherwise you can cut this part.
+
+<#
+
+# If you have more than 1 VDI environment int the same domain - Test and Prod for example
+
+$directory2 = New-Object System.DirectoryServices.DirectoryEntry("LDAP://[HORIZONCXSERVER2]:389/OU=Server Groups,DC=vdi,DC=vmware,DC=int")
+
+
+
+foreach ($pool in $directory2.psbase.Children)
+
+{
+
+    $objTemp = $objTemplateObject | select *
+
+
+
+    $objTemp.Name = ($pool.'pae-DisplayName').ToString()
+
+    $objTemp.MI = ($pool.'pae-SVIVmParentVM').ToString().split('/') | Select-Object -Last 1
+
+    $objTemp.SS = ($pool.'pae-SVIVmSnapshot').ToString().Split("/") | select -Last 1
+
+    $objTemp.ou = ($pool.'pae-ContainterPath').ToString()
+
+    $objTemp.total = ($pool.'pae-VmMaximumCount').ToString()
+
+    $objTemp.defaultProtocol = ($pool.'pae-ServerProtocolDefault').ToString()
+
+    $objTemp.timeout = ($pool.'pae-OptDisconnectLimitTimeout').ToString()
+
+    $objTemp.HTML = ($pool.'pae-HTMLAccessEnabled').ToString()
+
+
+
+
+
+    $objList.Add($objTemp) | Out-Null
+
+}#>
+
+
+Next, you'll get your master image folder, images, and snapshots. This will take a little work to conform to your naming conventions. The way I do it is to have a master folder, the images have the same prefix, and I exclude the backups that end in _BAK. Adjust fire as needed. 
+
+$MIFolder = Get-Folder -Name [MASTERIMAGEFOLDER] -Server [VCENTER]
+
+
+
+#Get images that are in vCenter, but not an image used by a pool
+
+$unusedMI = Get-VM -Name [MASTERIMAGE-PREFIX]* -Location $MIFolder | Where-Object {$_.name -notlike "*_BAK*" -and ($objList | Select-Object -ExpandProperty MI) -notcontains $_.name} 
+
+
+
+#Get snapshots of master images that are NOT used by a pool
+
+$unusedSS = Get-VM -Name [MASTERIMAGE-PREFIX]* -Location $MIFolder | Where-Object {$_.name -notlike "*_BAK*" -and ($objList | Select-Object -ExpandProperty MI) -contains $_.name} | Get-Snapshot | Select-Object *| Where-Object {($objList | Select-Object -ExpandProperty SS) -notcontains $_.name} | Select-Object -Property Name,VM
+
+
+OK, now we have all our info and we'll put a HTML report together. Nothing fancy here, just taking strings and enclosing in HTML tags. 
+
+if($objList.Count -gt 0)#report does not send if empty
+
+{
+
+    #Generate html for email body
+
+    $file = "C:\temp\HZreport-body.html"
+
+
+
+    New-Item -Path $file -ItemType File -Force
+
+
+
+    Add-Content -Path $file -Value "<html><head></head><hr>"
+
+    Add-Content -Path $file -Value "<b>VDI Report for VDI BROS</b><br>"
+
+    Add-Content -Path $file -Value "<hr>"
+
+    Add-Content -Path $file -Value "<table border='1' style='width:100%'>"
+
+    Add-Content -Path $file -Value "<tr style='background-color:#AAAAAA'><b><td>PoolName</td><td>MasterImage</td><td>Snapshot</td><td>OU</td><td>Max</td><td>DefaultProtocol</td><td>DisconnectTime</td><td>HTML Allowed</td></b></tr>"
+
+
+
+    #create body of email in file
+
+    foreach($result in $objList)
+
+    {
+
+        $poolName = $result.Name
+
+        $masterImage = $result.MI
+
+        $snapshot = $result.SS
+
+        $ou = $result.ou
+
+        $max = $result.total
+
+        $defProto = $result.defaultProtocol
+
+        $disTime = $result.timeout
+
+        $htmlAllow = $result.HTML
+
+
+
+        Add-Content -Path $file -Value "<tr><td>$poolName</td><td>$masterImage</td><td>$snapshot</td><td>$ou</td><td>$max</td><td>$defProto</td><td>$disTime</td><td>$htmlAllow</td></tr>"
+
+    }
+
+
+
+    Add-Content -Path $file -Value "</table><br><br><br><br>"
+
+
+
+    Add-Content -Path $file -Value "<b>Unused Master Images</b><br>"
+
+    Add-Content -Path $file -Value "<hr>"
+
+    Add-Content -Path $file -Value "<table border='1' style='width:100%'>"
+
+    Add-Content -Path $file -Value "<tr style='background-color:#AAAAAA'><b><td>Master Image</td></b></tr>"
+
+
+
+    #create body of email in file
+
+    foreach($result in $unusedMI)
+
+    {
+
+        $name = $result.name
+
+
+
+        Add-Content -Path $file -Value "<tr><td>$name</td>></tr>"
+
+    }
+
+
+
+    Add-Content -Path $file -Value "</table><br><br><br><br>"
+
+
+
+    Add-Content -Path $file -Value "<b>Unused Snapshots on Used Master Images</b><br>"
+
+    Add-Content -Path $file -Value "<hr>"
+
+    Add-Content -Path $file -Value "<table border='1' style='width:100%'>"
+
+    Add-Content -Path $file -Value "<tr style='background-color:#AAAAAA'><b><td>Master Image</td><td>Snapshot</td></b></tr>"
+
+
+
+    #create body of email in file
+
+    foreach($result in $unusedSS)
+
+    {
+
+        $image = $result.VM
+
+        $snaps = $result.Name
+
+
+
+        Add-Content -Path $file -Value "<tr><td>$image</td><td>$snaps</td></tr>"
+
+    }
+
+
+
+    #close file
+
+    Add-Content -Path $file -Value "</table></html>"
+
+
+
+OK, .html file is created. Send an email to admins and good to go
+
+    #Now let's send the email    
+
+    $body = [System.IO.File]::ReadAllText($file)
+
+    $subject = "VDI Report"
+
+    $to = "VDIteam@eamil.com"
+
+    Send-MailMessage -Body $body -Subject $subject -From "VDIreport@email.com" -To $to -SmtpServer [SMTPSERVER] -Port 25 -BodyAsHtml
+
+
+
+
+
+    #let's cleanup the temp file
+
+    Remove-Item -Path $file -Force -ErrorAction SilentlyContinue
+
+}
+
+
+Lot of pieces here, but read through it a few times. Run some tests, and get it tweaked for your needs. I sometimes refresh a dozen pools over the weekend, and this report is in my inbox Monday AM. Saves me a ton of time in the AM, and I refer back to it all week whenever I have a question about pool config.

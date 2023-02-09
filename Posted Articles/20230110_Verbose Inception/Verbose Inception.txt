@@ -1,0 +1,181 @@
+<#####################################################################################
+
+
+Gonna  go ahead and front this with a note that this somehow turned into a really hard article write. I guess I was trying to straddle the line of being really obvious (verbose), and usable for casual and experienced user, and about half the words. Trying to explain what "verbose" means is tough. "What's verbose mean? Uhm it means .... it's verbose". Anyway, hope this gives you some ideas that are better than this mess below... Mayeb I need an editor?
+
+
+#####################################################################################>
+
+
+Now that you're in this far, let's talk about how to use complicated code to make verbose even better. If you're not familiar with what "-Verbose" is, just try these cmdlets for a good example.
+
+
+New-Item -Path c:\temp -Name deleteme.txt
+
+Remove-Item -Path C:\TEMP\deleteme.txt
+
+
+
+New-Item -Path c:\temp -Name deleteme.txt
+
+Remove-Item -Path C:\TEMP\deleteme.txt -Verbose
+
+
+You get it - it's "verbose". Next step, what if you want to have verbose output on a function/cmdlet that you create? The trick is to add the cmdletbinding attribute to your function. When that attribute is part of your function, it has access to use the -Verbose parameter (and others).
+
+
+function Test-Verbose { 
+
+    [CmdletBinding]
+
+    param()
+
+    begin{}
+
+    process{}
+
+    end{}
+
+}
+
+
+Once you add that attribute, you can add Write-Verbose cmdlet statements to your function to show console output to the user. So if the user of your cmdlet wants to see when "UserX" is being migrated, you can include some pretty messages, and the user calling the function has the option to send the messages to the console with the -verbose parameter.
+
+
+Alright, I went through all of that level 1 stuff to get to this... how do you cascade -Verbose from a calling function down to sub-functions\cmdlets dynamically. Let me pseudocode that out so I'm totally clear...
+
+
+Call F1 with verbose parameter
+
+    Do some processing
+
+    Call function F2 -Verbose ??? (how do I get this function to use -verbose or not without hardcoding it)
+
+    Return F2
+
+Return F1
+
+
+You have a few different options there. You could use an if..else checking for the verbose parameter being called in the F1 function. Or you could assign the value of the verbose parameter to a new variable that I call $scopeVerbosePreference. Then you can use that variable to control the -Verbose parameter for the cmdlets that you call inside of your created function.
+
+
+When I first wanted to use this functionality, what I found was to check the automatic variable $PSBoundParameters that gets created when a cmdlet is called. That variable is a hash table of the parameters associated with that cmdlet call. This gives you the ability to find if the cmdlet had the Verbose switch called with it. 
+
+
+So if I call a function Test-Verbose –Verbose, then $PSBoundParameters.ContainsKey('Verbose') will evaluate to "$TRUE". Then any Write-Verbose statements processed in the function should have verbose output (still needs work for the larger effort, but I'll get to that below). This is the first technique I found from research. So what if I call the same function, but with a small change "Test-Verbose –Verbose:$false"? $PSBoundParameters.ContainsKey('Verbose') is still true because the key does exist. But the actual value assigned to the property "Verbose" is $false. Verbose – just like other default cmdlet switch parameters – are bools. If it exists it is true by default, but it can still be assigned $false. 
+
+
+The fix is just to check for the value assigned to Verbose. If Verbose -eq $TRUE, then Write-Verbose output is directed to the terminal. If FALSE, it isn't. So why would this be a concern and why would anyone assign $false to –Verbose? One scenario is if you never want a function (or more likely a sub-function) to show verbose output. Let's define 2 functions, and one calls the other. If the outside function is invoked with -Verbose, then it would make sense that the inside function called should also be verbose. So the –Verbose parameter for the inside function would need a way to be assigned TRUE or FALSE. In the top-level function, I'll assign that value found to a new var $scopeVerbosePreference. Then the inside function can be called using Test-V2 –Verbose:$scopeVerbosePreference, and whatever verbose level the outside function has, the inside function will as well. You definitely could also achieve this logic with an if..else block, with the if checking for Verbose -eq $true. But, if you have a really lengthy block of code, then you have to double your work. Whatever number of lines are in the TRUE block also have to be repeated in the FALSE block.
+
+
+The $scopeVerbosePreference will also account for the $VerbosePreference of the user. Say the user has $VerbosePreference set to "Continue" (show all verbose output), instead of "Silently Continue" (shut yo yap). The users' $VerbosePreference in that session will override (or be overridden) the verbose settings of any cmdlets. Setting the cmdlets and logic this way will let you control verbose output any number of layers down into sub-functions, and respect how the user's verbose preference is set.
+
+
+ function Test-Verbose { 
+
+    [CmdletBinding(SupportsShouldProcess=$true, 
+
+                   ConfirmImpact='Medium')] 
+
+    Param ( 
+
+        [Parameter] 
+
+        $comName, 
+
+        [Parameter] 
+
+        $Strang 
+
+    ) 
+
+    begin { 
+
+        if($PSBoundParameters.ContainsKey('Verbose')) 
+
+        { 
+
+            $scopeVerbosePreference = $PSBoundParameters.SyncRoot['Verbose'].IsPresent 
+
+        } 
+
+        else 
+
+        { 
+
+            $scopeVerbosePreference = $VerbosePreference 
+
+        } 
+
+    } 
+
+    process { 
+
+        Write-Verbose -Message "Test-Verbose: only see this line when -Verbose" -Verbose:$scopeVerbosePreference 
+
+        Write-Host "Test-Verbose: PSBoundParameters" $PSBoundParameters
+
+        Test-V2 -Verbose:$scopeVerbosePreference 
+
+    } 
+
+
+
+    end { 
+
+        return $PSBoundParameters 
+
+    } 
+
+} 
+
+
+function Test-V2 { 
+
+    [CmdletBinding(SupportsShouldProcess=$true, 
+
+                   ConfirmImpact='Medium')] 
+
+    param ( 
+
+    ) 
+
+    begin { 
+
+        if($PSBoundParameters.ContainsKey('Verbose')) 
+
+        { 
+
+            $scopeVerbosePreference = $PSBoundParameters.SyncRoot['Verbose'].IsPresent 
+
+        } 
+
+        else 
+
+        { 
+
+            $scopeVerbosePreference = $VerbosePreference 
+
+        } 
+
+    } 
+
+
+
+    process { 
+
+        Write-Verbose "Test-V2 : only see this line with -Verbose" -Verbose:$scopeVerbosePreference 
+
+        Write-Host "Test-V2: ScopeVerbosePreference = " $scopeVerbosePreference 
+
+        Write-Host "Test-V2: VerbosePreference = " $VerbosePreference 
+
+    } 
+
+    end { 
+
+        return $PSBoundParameters 
+
+    } 
+
+} 

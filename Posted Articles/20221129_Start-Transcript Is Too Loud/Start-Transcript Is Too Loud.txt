@@ -1,0 +1,128 @@
+There are 2 problems with the Start-Transcript cmdlet. First, unlike most other cmdlets, assigning the output of the cmdlet only returns a string that the transcript was started, not an object. Most commands return and object or reference that can be used later to interact with that object. Maybe to reference the transcript or stop it. It's just un-PowerShell like.
+
+
+Two – other side of that coin, it always outputs that string that the transcript has started. That's not bothersome if the entire session is being recorded, or if you're tracking the progress of a new script or function. But, in the case of the project I'm working on now, it makes for a lot of terminal output that at first was helpful, but now that the majority of bugs are out, it's just unnecessary. For context, this project has one master function that calls 200+ separate functions that can be called multiple times – each of those has the ability to start a transcript. The log directory for it grows to several thousand individual files if I run it a few times a day. 
+
+
+So, since number two is the problem currently, I went with fixing that. (I have done some investigation on number 1 and got nowhere so I'll save that for later). The fix for the annoying output is to create a new cmdlet on top of start-transcript – Start-QuietTranscript. Essentially create a new function that calls Start-Transcript | Out-Null. So far I have only added parameters for the path to the transcript and the Append parameters – but the others would fit in pretty easily.  
+
+
+<# 
+
+.Synopsis 
+
+   Start a transcript - but without the string output 
+
+.EXAMPLE 
+
+   Start-QuietTranscript -Path ".\test.log" 
+
+.INPUTS 
+
+   NONE 
+
+.OUTPUTS 
+
+   NONE 
+
+.NOTES 
+
+   NONE 
+
+#> 
+
+
+
+function Start-QuietTranscript 
+
+{ 
+
+    [CmdletBinding(DefaultParameterSetName='Parameter Set 1',  
+
+                  SupportsShouldProcess=$true,  
+
+                  PositionalBinding=$false, 
+
+                  ConfirmImpact='Medium')] 
+
+
+
+    Param 
+
+    ( 
+
+        # Param1 help description 
+
+        [Parameter(Mandatory=$false)]  
+
+        [STRING]$Path, 
+
+
+
+        # Param2 help description 
+
+        [Parameter(Mandatory=$false)] 
+
+        [switch]$Append 
+
+    ) 
+
+    Begin 
+
+    { 
+
+        if($PSBoundParameters.ContainsKey('Verbose')) 
+
+        { 
+
+            $scopeVerbosePreference = $PSBoundParameters.SyncRoot['Verbose'].IsPresent 
+
+        } 
+
+        else 
+
+        { 
+
+            $scopeVerbosePreference = $VerbosePreference 
+
+        } 
+
+        Write-Verbose "BEGIN $($MyInvocation.mycommand.name)" -Verbose:$scopeVerbosePreference 
+
+    } 
+
+    Process 
+
+    { 
+
+        Write-Verbose "PROCESS $($MyInvocation.mycommand.name)" -Verbose:$scopeVerbosePreference 
+
+        if ($pscmdlet.ShouldProcess("Target", "Operation")) 
+
+        { 
+
+        } 
+
+        Get-Location -Verbose:$scopeVerbosePreference
+
+        Start-Transcript -Path $Path -Append:$Append | Out-Null 
+
+    } 
+
+    End 
+
+    { 
+
+        Write-Verbose "END $($MyInvocation.mycommand.name)" -Verbose:$scopeVerbosePreference 
+
+        Write-Verbose "EXIT $($MyInvocation.mycommand.name)" -Verbose:$scopeVerbosePreference 
+
+    } 
+
+} 
+
+
+Using this cmdlet isn't meant to be a replacement for the original, but it definitely has it's use cases. 
+
+
+PS: If the parts around here (-Verbose:$scopeVerbosePreference) and here (-Append:$Append) aren't clicking for you, those'll be covered in another article around here...

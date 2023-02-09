@@ -1,0 +1,61 @@
+Creating custom objects is the most efficient way to work with data from different sources. If you need to collect info on a virtual server in a vCenter, being able to combine data from AD and from VMware is useful for reports and updating asset management. 
+
+
+Real world example coming: At a previous position, I setup a process to track metadata for virtual machines and write those values to attributes in the AD object for that server. Every VM in a vCenter would have several custom attributes (POC, system, role, etc). When those values got filled, the values would get copied to the AD computer object. It was a good way to track what VMs belonged to who, and abandoned AD objects would be easily identifiable. I also scanned the VM attributes once a week and sent out a shame email to POCs that had VM attributes that were empty.
+
+
+I would also generate a report to track progress, and to do that I would need to pull data from AD and vCenter. Using the New-Object cmdlet to create a PSCustomObject, I would create properties for that object, and assign any values necessary. To work with multiple objects, create an array of that object and iterate through your list.
+
+
+Run the code below to create a list of all items on the C: drive. This doesn't pull info from various sources, but it shows that a custom object can be created with the properties you need. Once the object is instantiated, you can pull data from any source.
+
+
+
+#create the new object
+
+$objTemplateObject = New-Object -TypeName psobject
+
+
+
+#make some properties for it
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name Name -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name CreatedDate -Value $null
+
+$objTemplateObject | Add-Member -MemberType NoteProperty -Name ModifiedDate -Value $null
+
+
+
+#create a new dynamic array
+
+$objList = New-Object System.Collections.ArrayList
+
+
+
+#create a list of files
+
+foreach($file in $(Get-ChildItem -Path C:\. -Depth 1))
+
+{
+
+    #instantiate 1 of those objects
+
+    $objTemp = $objTemplateObject | Select-Object *
+
+    #add values to the properties
+
+    $objTemp.Name = $file.Name
+
+    $objTemp.CreatedDate = $file.CreationTime
+
+    $objTemp.ModifiedDate = $file.LastWriteTime
+
+    #add the object to an array
+
+    $objList.Add($objTemp) | Out-Null
+
+}
+
+
+There are any number of ways to create an object, but this has been my go-to for years. Very reader friendly, so I keep that exact code in an examples folder and copy it out whenever I need it. Should probably put that in a snippet…

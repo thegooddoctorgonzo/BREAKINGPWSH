@@ -1,0 +1,112 @@
+Creating snippets for PowerShell is a great way to up your efficiency. I completed the first draft of a project recently that required almost 200 separate function files. Each of those files had the same pattern, with the only change being the code logic for the function to get its finding. So I created a template for the snippet, then each new file was just inserting the template and changing a few lines. It might seem that copy paste works just as well, but not at this scale.
+
+
+Creating a new snippet for posh5/ISE is a very intuitive process. First, create a function or code or anything you need to replicate reliably. I'll set up a script header for marking scripts with author, date, etc.
+
+
+<#	
+
+    .NOTES
+
+    ===========================================================================
+
+        Created on:   	***
+
+        Created by:   	***
+
+        Organization: 	***
+
+        Filename:     	***
+
+        DESCRIPTION:    ***
+
+    ===========================================================================
+
+
+
+#>
+
+
+Then it's just a one-liner (kinda) to create the snippet. The snippet text needs to be enclosed in single quotes - and if your code has single quotes in it, change them to double single quotes (' -> ''). I always add a "`" character (that's a grave accent, same key as the ~ top left keyboard - Escape characters - PowerShell - SS64.com ) for line continuation, then add the text below it in the ISE editor.
+
+
+New-IseSnippet -Title "1_Script-Header" -Description "1_Script-Header" -Text ` #<Grave Accent
+
+' #<Single Quote
+
+<#	
+
+    .NOTES
+
+    ===========================================================================
+
+        Created on:   	***
+
+        Created by:   	***
+
+        Organization: 	***
+
+        Filename:     	***
+
+        DESCRIPTION:    ***
+
+    ===========================================================================
+
+
+
+#>
+
+'
+
+
+You can pull up the snippet menu with ctrl + j. They show in the menu in order - note the 1_ starts the name so all my custom snippets show at the top of the menu. One more thing to note is that if you need to recreate a snippet, it first needs to be removed - and the host session needs to be restarted as it caches the snippets when it starts. So if you need to remove one...
+
+
+Get-IseSnippet
+
+
+That will show all snippets. Say you want to remove number 3 in the list.
+
+
+(Get-IseSnippet)[2] | Remove-Item
+
+
+Then cycle the session and recreate it. Editing the snippet in it's XML format is also an option. Snippet files (default location) are in your Documents folder\Windows Powershell\Snippets. Open the snippet.ps1xml in an editor and make your changes. Restarting the host session is necessary to read the changes.
+
+
+Creating snippets for PWSH 7 in VSCode is about as different from that as it gets. All your snippets are created in one file - powershell.json. In VSCode go to file -> Preferences -> User Snippets and choose Powershell from the search menu. The file will be created for you and open in the editor. You'll have some comments with instructions on how to add snippets. For a simple one-line snippet, this is very easy. Copy and paste the example below to the bottom of the file, but above the closing curly bracket.
+
+
+  "Name": {
+
+    "prefix": ["for", "for-const"],
+
+    "body": ["FUNC_TEXT"],
+
+    "description": "A for loop."
+
+  }
+
+
+Give the snippet a name, prefix is the name that will be prominent in the snippet menu and for autofill, and description is ya know. Place your code in between the brackets and double quotes for body, save the file, and it is immediately available. Hit F1, type snip, and the available items will show in the menu.
+
+
+But what if you have a multi-line code snippet? JSON values do not accept multi-line so you'll have to substitute every tab, space, special char with its character or escape it. If you have worked with regex, this should be familiar. For me to get my 150-line long cmdlet snippet, it took some work, but I have steps outlined that should work in most cases.
+
+
+1. Copy your code from the ISE
+
+2. Copy to Notepad++
+
+3. ctrl + h - replace $ with \$  -  standard search and replace, not regex
+
+4. ctrl + h - replace SPACE x 3 or SPACE x 4 (whatever your tab indent spacing is) with \t  -  use regex search and replace
+
+	4a. If you don't know what your tab indent spacing is, open a PowerShell file, hit tab on a line, the count the number of spaces back to the margin
+
+5. Copy that new text to https://www.freeformatter.com/json-escape.html#ad-output
+
+6. Get the output and that is what you'll paste to the body value
+
+
+Two very different ways to get it done. Pros and cons for each I guess. The VSCode version is a little trickier to get right, but much easier to edit.

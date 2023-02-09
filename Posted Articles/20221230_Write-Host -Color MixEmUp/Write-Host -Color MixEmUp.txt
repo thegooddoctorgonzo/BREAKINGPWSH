@@ -1,0 +1,39 @@
+Quick one here to make output in the terminal a bit more readable to the user running the script. In a recent cmdlet I built, before the PROCESS block is run, the values of all the variables are output to the terminal for the user to approve or reject. But the output was difficult to read. Five lines of file and folder paths, and everything the same color made reading difficult.
+
+
+Write-host has a parameter that I never took any notice of till now, -NoNewLine. Using that param, I'm able to make the variable name and its value different colors, and it made reading the lines much easier. Seems unimportant to hold the users hand and show them pretty colors. But I want to make sure they are able to comprehend what they are approving, not just gloss over it because it's a text wall.
+
+
+$userPath = "C:\Users\username\Documents"
+
+$logPath = ".\Code\Projects\Logfiles\January"
+
+$xmlPath = "\\share\Cyber\XMLFiles"
+
+$configPath = "\\share\Admins\ConfigMgmt\2021\Feb"
+
+
+
+Write-Host -Object "`n"
+
+Write-Host -Object 'userPath : ' -NoNewline -ForegroundColor Yellow
+
+Write-Host -Object $userPath -ForegroundColor Green
+
+Write-Host -Object 'logPath : ' -NoNewline -ForegroundColor Yellow
+
+Write-Host -Object $logPath -ForegroundColor Green
+
+Write-Host -Object 'xmlPath : ' -NoNewline -ForegroundColor Yellow
+
+Write-Host -Object $xmlPath -ForegroundColor Green
+
+Write-Host -Object 'configPath : ' -NoNewline -ForegroundColor Yellow
+
+Write-Host -Object $configPath -ForegroundColor Green
+
+
+That provides a nice clean output that is easy to read. 
+
+
+Extra note: If you have been using Powershell for long enough to have found the Write-Host vs Write-Output controversy, this is an appropriate use of Write-Host. There is a time and a place for both.

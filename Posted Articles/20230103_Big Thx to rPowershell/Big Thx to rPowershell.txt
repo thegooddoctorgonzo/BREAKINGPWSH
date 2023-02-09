@@ -1,0 +1,10 @@
+Just wanted to throw a quick thanks to the people of r/PowerShell. I put a post on there tonight just to show off this project I've been working on. Fully expecting downvotes and no interaction - and I was very VERY surprised at the amount of comments, votes, and suggestions. And I got a lot of great comments and suggestions. Thanks to everyone that commented AND that clicked the link to come over - and to the mods for not deleting the post I guess...
+
+
+Good luck in your dev redditors. 
+
+
+Guess I should actually add something to learn here. Did you know if you install PowerShell on Linux, you can mix bash and PowerShell commands...
+
+
+watch -x  pwsh.exe -noprofile -c Get-ChildItem

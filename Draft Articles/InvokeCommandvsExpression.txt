@@ -1,0 +1,1 @@
+And Invoke-Command -InDisconnectedSessin vs AsJob

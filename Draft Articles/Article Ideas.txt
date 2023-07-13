@@ -1,1 +1,5 @@
 What would "/" or "\" do if they did similar to "|"
+
+All the meanings of "."
+
+-outvariable doesnt work for Invoke-expression

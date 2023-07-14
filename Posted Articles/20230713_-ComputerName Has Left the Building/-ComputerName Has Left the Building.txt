@@ -1,0 +1,41 @@
+When I first started transitioning over to pwsh version 7, I noticed that a very common parameter was missing from some very common cmdlets. Well - I noticed it when scripts started breaking. The  -ComputerName parameter is not included in the version 7 cmdlets ....
+
+Get-EventLog
+Get-Process
+Get-Service
+Get-WmiObject
+
+...and that's just the Microsoft.PowerShell.Management module. 
+
+$cmdlets = Get-Command -Verb get -Module Microsoft.PowerShell.Management | select -Property *
+
+foreach($c in $cmdlets | where {$_.parameters.keys -contains "ComputerName"})
+{
+    $c.name
+}
+
+It's always been a very handy parameter to use when interacting with remote systems. Iterating through a foreach loop to get service status from a list of servers is pretty easy with that param. It's even easily understood by pwsh beginners - put the computer name next to -ComputerName. Even if the value is the local system name - as long as it's a valid, resolvable name. 
+
+The fix for this is not complicated at all - it doesn't even add an additional line to code to replace it. Invoke-Command already covers any interaction we need to do with remote systems. You could even use some of the *-PSSession cmdlets for more complicated queries - or if that's just the way you like to do things. Just for completeness, I'll compare...
+
+Get-Service -ComputerName server1 -Name BITS
+Invoke-Command -ScriptBlock {Get-Service -Name BITS} -ComputerName server1
+
+No big deal. Will probably break a lot of legacy scripts when flipping over to version 7 though (good thing you have Pester tests, right?). Nothing that can't be fixed by either updating scripts and funcs (see replacing text article), or - if you're hard core and hate people in the future - you could call posh 5 just for that line and assign the output.
+
+$stopit = Invoke-Expression -Command "powershell.exe get-service -computername server1"
+
+For real - don't do that. Or do. Whatever. It's fun.
+
+So, this leaves us with the why. Why has -ComputerName been pushed out? I had to do some digging to figure it out - although it turned out to be exactly what my first instinct said it was. Which was/is.... Linux. That -ComputerName param only works when it can use the WinRM/WSMAN protocols. Haven't come across a Linux system with those protocols yet - and posh on Linux has been a thing for a while now. We need to address a few acronym protocols to get the full story, so let's get those out of the way here.
+
+CIM - “Common Information Model” a standard of how to display managed data in an easy-to-read format
+WMI - "Windows Management Instrumentation" Microsoft's implementation of CIM specific to Windows systems
+WSMAN - " Web Services for Management" a standard for remotely exchanging management data with any computer device that implements the protocol
+WinRM - "Windows Remote Management" Microsoft implementation of the WS-Management protocol
+
+I'll try to sum up that past 20+ years of history succinctly. CIM was created to query a local system and display the data in a friendly format. MS built WMI on top of CIM to be specific to Windows. WSMan took WMI and added web (SOAP) protocol to it to be able to query remote systems. WinRM is MS's version of WSMan with security for the connection - even encryption over http which just sounds weird and cool. If you have used Enter-PSSession or the -ComputerName param, you were using WinRM. 
+
+Back to why -ComputerName got dropped. If PowerShell is going to be (basically) OS agnostic, they aren't going to all be Win boxes. Pretty sure those protocols aren't gonna be added to the Linux kernel. PowerShell developers had to fall all the way back to something that has been an option on a majority of OS's for years - CIM. Thats the only protocol in the list that can query Windows and Linux systems. WinRM does still work on Windows to Windows systems - when you are using New-PSSession, Enter-PSSession, and Invoke-Command. But those commands also work on Win to Linux because they can use SSH to make the connection.
+
+So that's it. ComputerName has been made obsolete for the future because PowerShell has gone back in time 20 years to use the original CIM. (It's probably more complicated than that, but this is just a blog post and it's super good enough)

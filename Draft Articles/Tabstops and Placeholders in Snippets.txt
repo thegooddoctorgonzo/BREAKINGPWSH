@@ -1,4 +1,0 @@
-Placeholders are cool ${1:TAB_TO_HERE}
-
-
-Could probably make a function

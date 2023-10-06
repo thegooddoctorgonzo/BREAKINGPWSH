@@ -1,0 +1,17 @@
+I use the cmdlet Start-Job and the parameter -AsJob pretty often in scripting. If I have a lot of iterative processing, then assigning each iteration to its own job really saves a lot of time. Say I have to check every computer object in AD for some property, doing each check as a job in parallel instead of serial can make a huge difference. Just for context, where I work at the moment there's something like 17,000 computer objects.
+
+Then I thought today, what's the upper limit? Google and the MS pwsh site did not lead me to a hard limit of how many jobs could be run consecutively. You would think it would be like 64, 256 - something like that. So that leaves me 2 items I want to figure out - is there an actual limit where the pwsh engine will stop creating new jobs until older ones are closed, and is there a functional limit aka can I crash my computer?
+
+So I want to start a bunch of jobs to do something. I figured Start-Sleep is the bare minimum to start a job, but not really eating up any processing power. Make a loop to start a lot of jobs, track what loop its on, and collect total mem used by all the processes and ready to go. 
+
+I started with 10 - no problem, couple seconds to run. Then 100 - I really expected 100 to show some kind of sign that it was throttling the job creation. Nope, no problems. Took maybe 45 seconds. Ramped up to a grand and now there is something to watch.
+
+Here is what I noticed....
+The first 500 jobs - and Start-Job actually starts 2 jobs and PIDs per job for the parent and child jobs, so 500 jobs is 1000 PIDs - no problem, got up to 500 jobs in maybe a minute
+From there it got way slower
+CPU never got very high. Maybe maxed at about 40%
+RAM went to 99% before 500 jobs got running
+Commited memory eventually got to like 70GB. Never seen a paging file that big and disk RW was full out
+Then this weird cycle would happen that I've never actually watch happen. RAM usage would hit like 9GB, then dump to 1GB but at the same time disk write would spike to 100% as it dumped to page file. CPU would spike a bit. Funny one is that task manager would show action on every other process when the dump to page file happened. Like every other process saw an oppurtunity to grab a sliver of RAM.
+
+And the outcome is ----- no crash. Kinda disappointing. But 1000 jobs started - kinda cool. My assessment, there is not hard limit to jobs that can be run concurrently. But realistically, there is a functional limit where effeciency will be lessened. I'd say on an everyday system, about 100 is a good starting point. Should be pretty easy to put in some logic to check for the count of jobs running and put in a buffer to wait for a few to finish before starting more. Or just go for it, run 10k of em, spread it out to multiple systems maybe. Make your own botnet, do something cool.

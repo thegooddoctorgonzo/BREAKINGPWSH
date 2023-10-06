@@ -1,3 +1,0 @@
-Maximum Jobs - and changing max
-Working with the object
-break it - can probably crash the OS

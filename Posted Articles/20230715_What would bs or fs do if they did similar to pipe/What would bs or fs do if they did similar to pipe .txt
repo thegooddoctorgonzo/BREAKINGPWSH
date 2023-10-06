@@ -1,0 +1,21 @@
+Had a dumb idea a few weeks ago. What would "/" or "\" do if they did an action similar to "|"?
+
+Maybe backslash runs the left command the same number of times as there are slashes? And foward slash runs the right command that number of times. Let's start with a scenario that might be useful - check a process and send the output to file.
+
+Get-Process -Name explorer | out-file .\file.txt -Append
+
+OK that works. Normal piepline action there. Now lets check it every second for 5 iterations with a do..while. (Just so it's easier to read, I'm gonna use Get-Date instead of get-process. Easier to read and to see the time differences.)
+
+$i = 0;do{Start-Sleep -s 1; get-date | out-file .\file.txt -Append; $i++}while($i -lt 5)
+
+Cool that works. So how would that be written with backslash instead of pipe?
+
+Start-Sleep -s 1; get-date \\\\\ out-file .\file.txt -Append
+
+Looks about right. I am making up the rules as we go so it's definitely right. The left side would run 5 times, each time it would go to pipeline, the the right side runs once and outputs everything in pipeline to the out file. Seems like it would be useful. Let's see what the other way would look like - left side once and right side 5 times.
+
+$i = 0;get-date ///// out-file ".\file$i.txt" -Append; $i++
+
+Sure, that should work. Set an index var, get-date runs once, and outputs the same info to 5 different files as the index updates.
+
+Well damn, I seem to have invented a novel way of using the pipeline on a rainy Saturday morning. Maybe I should send this to the pwsh Team and let them tear it apart? Hit me up at the contacts below and give me your take on / and \ piping.
